@@ -18,11 +18,11 @@ export async function getConfig(): Promise<Config> {
   const entrypoint = core.getInput('entrypoint')
   const network = core.getInput('network')
   const command = core.getInput('command')
-  const opts = core.getInput('options')
-  core.debug(`opts = ${opts}`)
-  const options = (opts ? (await yargs.parse(opts))['_'] : []) as string[]
-  core.debug(`yargs = ${JSON.stringify(await yargs.parse(opts))}`)
+  const opts = (await yargs.parseAsync(core.getInput('options'))) as {
+    [key: string]: string | number
+  }
   let shell = core.getInput('shell')
+  let options: string[] = []
 
   if (run && run.length && !shell) {
     shell = 'sh'
@@ -34,6 +34,15 @@ export async function getConfig(): Promise<Config> {
 
   if (entrypoint && shell) {
     throw Error('cannot specify both entrypoint and shell')
+  }
+
+  for (const k in opts) {
+    if (k === '_' || k === '$0') {
+      continue
+    }
+
+    options = options.concat(k)
+    options = options.concat(opts[k].toString())
   }
 
   return {
