@@ -20,7 +20,7 @@ async function run(): Promise<void> {
     args = args.concat(config.image)
 
     if (config.run) {
-      args = args.concat('-c', config.run)
+      args = args.concat(`-c "${config.run}"`)
     } else if (config.command) {
       args = args.concat(config.command)
     }

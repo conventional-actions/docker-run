@@ -1,9 +1,10 @@
 import {parseMultiInput} from '@conventional-actions/toolkit'
 import * as core from '@actions/core'
+import {parse} from 'shell-quote'
 
 type Config = {
   image: string
-  options: string
+  options: string[]
   entrypoint: string
   command: string
   run: string
@@ -34,7 +35,7 @@ export async function getConfig(): Promise<Config> {
 
   return {
     image,
-    options,
+    options: parse(options).map(x => x.toString()),
     entrypoint,
     command,
     run,
