@@ -38,6 +38,7 @@ jobs:
         with:
           image: docker
           options: -v ${{ github.workspace }}:/work
+          shell: /bin/bash
           run: |
             echo "::set-output name=file-contents::`cat /work/someFile`"
       - name: Check if file contents match
