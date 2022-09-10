@@ -2,10 +2,16 @@ name: 'Docker Run'
 description: 'Run a command in a new container'
 inputs:
   image:
-    description: 'Image'
+    description: 'Container image to run'
     required: true
   options:
-    description: 'Options'
+    description: 'Options to pass to Docker'
+    required: false
+  command:
+    description: 'Container command'
+    required: false
+  entrypoint:
+    description: 'Container entrypoint'
     required: false
   run:
     description: 'Run command in container'
@@ -13,7 +19,6 @@ inputs:
   shell:
     description: 'Use a specific shell'
     required: false
-    default: sh
   network:
     description: 'Docker Network ID'
     default: ${{ job.container.network }}
