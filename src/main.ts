@@ -5,6 +5,7 @@ import {getConfig} from './config'
 async function run(): Promise<void> {
   try {
     const config = await getConfig()
+    core.debug(JSON.stringify(config))
 
     let args: string[] = [
       'run',

@@ -11886,7 +11886,9 @@ async function getConfig() {
     const network = core.getInput('network');
     const command = core.getInput('command');
     const opts = core.getInput('options');
+    core.debug(`opts = ${opts}`);
     const options = (opts ? (await yargs.parse(opts))['_'] : []);
+    core.debug(`yargs = ${await yargs.parse(opts)}`);
     let shell = core.getInput('shell');
     if (run && run.length && !shell) {
         shell = '/bin/sh';
@@ -11947,6 +11949,7 @@ const config_1 = __nccwpck_require__(6373);
 async function run() {
     try {
         const config = await (0, config_1.getConfig)();
+        core.debug(JSON.stringify(config));
         let args = [
             'run',
             '-v',
