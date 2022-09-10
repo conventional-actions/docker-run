@@ -38,16 +38,14 @@ jobs:
         with:
           image: docker
           options: -v ${{ github.workspace }}:/work
-          shell: /bin/bash
-          run: |
-            echo "::set-output name=file-contents::`cat /work/someFile`"
+          run: echo "::set-output name=file-contents::$(cat /work/someFile)"
       - name: Check if file contents match
         uses: actions/github-script@v3
         with:
           script: |
             const fileContents = '${{ steps.run-docker.outputs.file-contents }}';
             if (fileContents !== 'some text') {
-              core.setFailed(`Unable to mount workspace volume`);
+              core.setFailed(`Unable to mount workspace volume, received: ` + fileContents);
             }
   container-network-test:
     runs-on: ubuntu-latest
