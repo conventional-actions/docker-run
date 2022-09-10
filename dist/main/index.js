@@ -11889,7 +11889,7 @@ async function getConfig() {
     const options = (opts ? (await yargs.parse(opts))['_'] : []);
     let shell = core.getInput('shell');
     if (run && run.length && !shell) {
-        shell = "/bin/sh";
+        shell = '/bin/sh';
     }
     if (run && command) {
         throw Error('cannot specify both run and command');
@@ -11950,7 +11950,7 @@ async function run() {
         let args = [
             'run',
             '-v',
-            '/var/run/docker.sock:/var/run/docker.sock',
+            '/var/run/docker.sock:/var/run/docker.sock'
         ];
         if (config.options) {
             args = args.concat(config.options);
