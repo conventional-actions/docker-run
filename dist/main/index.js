@@ -10184,8 +10184,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getConfig = void 0;
 const toolkit_1 = __nccwpck_require__(2539);
-const core = __importStar(__nccwpck_require__(2186));
 const shell_quote_1 = __nccwpck_require__(7029);
+const core = __importStar(__nccwpck_require__(2186));
 async function getConfig() {
     const run = (0, toolkit_1.parseMultiInput)(core.getInput('run')).join('; ');
     const image = core.getInput('image', { required: true });
@@ -10254,7 +10254,14 @@ async function run() {
     try {
         const config = await (0, config_1.getConfig)();
         core.debug(JSON.stringify(config));
-        let args = [];
+        let args = [
+            'run',
+            '-v',
+            '/var/run/docker.sock:/var/run/docker.sock'
+        ];
+        if (config.options) {
+            args = args.concat(config.options);
+        }
         if (config.network) {
             args = args.concat('--network', config.network);
         }
@@ -10263,12 +10270,12 @@ async function run() {
         }
         args = args.concat(config.image);
         if (config.run) {
-            args = args.concat(`-c "${config.run}"`);
+            args = args.concat('-c', config.run);
         }
         else if (config.command) {
             args = args.concat(config.command);
         }
-        await exec.exec(`docker run -v /var/run/docker.sock:/var/run/docker.sock ${config.options} ${args.join(' ')}`);
+        await exec.exec('docker', args);
     }
     catch (error) {
         if (error instanceof Error)

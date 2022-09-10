@@ -1,6 +1,6 @@
 import {parseMultiInput} from '@conventional-actions/toolkit'
-import * as core from '@actions/core'
 import {parse} from 'shell-quote'
+import * as core from '@actions/core'
 
 type Config = {
   image: string
