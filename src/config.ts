@@ -21,11 +21,11 @@ export async function getConfig(): Promise<Config> {
   const opts = core.getInput('options')
   core.debug(`opts = ${opts}`)
   const options = (opts ? (await yargs.parse(opts))['_'] : []) as string[]
-  core.debug(`yargs = ${await yargs.parse(opts)}`)
+  core.debug(`yargs = ${JSON.stringify(await yargs.parse(opts))}`)
   let shell = core.getInput('shell')
 
   if (run && run.length && !shell) {
-    shell = '/bin/sh'
+    shell = 'sh'
   }
 
   if (run && command) {
