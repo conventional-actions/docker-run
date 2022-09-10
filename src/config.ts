@@ -1,10 +1,9 @@
 import {parseMultiInput} from '@conventional-actions/toolkit'
 import * as core from '@actions/core'
-import * as yargs from 'yargs'
 
 type Config = {
   image: string
-  options: string[]
+  options: string
   entrypoint: string
   command: string
   run: string
@@ -18,11 +17,8 @@ export async function getConfig(): Promise<Config> {
   const entrypoint = core.getInput('entrypoint')
   const network = core.getInput('network')
   const command = core.getInput('command')
-  const opts = (await yargs.parseAsync(core.getInput('options'))) as {
-    [key: string]: string | number
-  }
+  const options = core.getInput('options')
   let shell = core.getInput('shell')
-  let options: string[] = []
 
   if (run && run.length && !shell) {
     shell = 'sh'
@@ -34,15 +30,6 @@ export async function getConfig(): Promise<Config> {
 
   if (entrypoint && shell) {
     throw Error('cannot specify both entrypoint and shell')
-  }
-
-  for (const k in opts) {
-    if (k === '_' || k === '$0') {
-      continue
-    }
-
-    options = options.concat(k)
-    options = options.concat(opts[k].toString())
   }
 
   return {

@@ -7,15 +7,7 @@ async function run(): Promise<void> {
     const config = await getConfig()
     core.debug(JSON.stringify(config))
 
-    let args: string[] = [
-      'run',
-      '-v',
-      '/var/run/docker.sock:/var/run/docker.sock'
-    ]
-
-    if (config.options) {
-      args = args.concat(config.options)
-    }
+    let args: string[] = []
 
     if (config.network) {
       args = args.concat('--network', config.network)
@@ -33,7 +25,11 @@ async function run(): Promise<void> {
       args = args.concat(config.command)
     }
 
-    await exec.exec('docker', args)
+    await exec.exec(
+      `docker run -v /var/run/docker.sock:/var/run/docker.sock ${
+        config.options
+      } ${args.join(' ')}`
+    )
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }
