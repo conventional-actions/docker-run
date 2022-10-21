@@ -140,7 +140,6 @@ const file_command_1 = __nccwpck_require__(717);
 const utils_1 = __nccwpck_require__(5278);
 const os = __importStar(__nccwpck_require__(2037));
 const path = __importStar(__nccwpck_require__(1017));
-const uuid_1 = __nccwpck_require__(5840);
 const oidc_utils_1 = __nccwpck_require__(8041);
 /**
  * The code to exit an action
@@ -170,20 +169,9 @@ function exportVariable(name, val) {
     process.env[name] = convertedVal;
     const filePath = process.env['GITHUB_ENV'] || '';
     if (filePath) {
-        const delimiter = `ghadelimiter_${uuid_1.v4()}`;
-        // These should realistically never happen, but just in case someone finds a way to exploit uuid generation let's not allow keys or values that contain the delimiter.
-        if (name.includes(delimiter)) {
-            throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
-        }
-        if (convertedVal.includes(delimiter)) {
-            throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
-        }
-        const commandValue = `${name}<<${delimiter}${os.EOL}${convertedVal}${os.EOL}${delimiter}`;
-        file_command_1.issueCommand('ENV', commandValue);
+        return file_command_1.issueFileCommand('ENV', file_command_1.prepareKeyValueMessage(name, val));
     }
-    else {
-        command_1.issueCommand('set-env', { name }, convertedVal);
-    }
+    command_1.issueCommand('set-env', { name }, convertedVal);
 }
 exports.exportVariable = exportVariable;
 /**
@@ -201,7 +189,7 @@ exports.setSecret = setSecret;
 function addPath(inputPath) {
     const filePath = process.env['GITHUB_PATH'] || '';
     if (filePath) {
-        file_command_1.issueCommand('PATH', inputPath);
+        file_command_1.issueFileCommand('PATH', inputPath);
     }
     else {
         command_1.issueCommand('add-path', {}, inputPath);
@@ -241,7 +229,10 @@ function getMultilineInput(name, options) {
     const inputs = getInput(name, options)
         .split('\n')
         .filter(x => x !== '');
-    return inputs;
+    if (options && options.trimWhitespace === false) {
+        return inputs;
+    }
+    return inputs.map(input => input.trim());
 }
 exports.getMultilineInput = getMultilineInput;
 /**
@@ -274,8 +265,12 @@ exports.getBooleanInput = getBooleanInput;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function setOutput(name, value) {
+    const filePath = process.env['GITHUB_OUTPUT'] || '';
+    if (filePath) {
+        return file_command_1.issueFileCommand('OUTPUT', file_command_1.prepareKeyValueMessage(name, value));
+    }
     process.stdout.write(os.EOL);
-    command_1.issueCommand('set-output', { name }, value);
+    command_1.issueCommand('set-output', { name }, utils_1.toCommandValue(value));
 }
 exports.setOutput = setOutput;
 /**
@@ -404,7 +399,11 @@ exports.group = group;
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function saveState(name, value) {
-    command_1.issueCommand('save-state', { name }, value);
+    const filePath = process.env['GITHUB_STATE'] || '';
+    if (filePath) {
+        return file_command_1.issueFileCommand('STATE', file_command_1.prepareKeyValueMessage(name, value));
+    }
+    command_1.issueCommand('save-state', { name }, utils_1.toCommandValue(value));
 }
 exports.saveState = saveState;
 /**
@@ -470,13 +469,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.issueCommand = void 0;
+exports.prepareKeyValueMessage = exports.issueFileCommand = void 0;
 // We use any as a valid input type
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const fs = __importStar(__nccwpck_require__(7147));
 const os = __importStar(__nccwpck_require__(2037));
+const uuid_1 = __nccwpck_require__(5840);
 const utils_1 = __nccwpck_require__(5278);
-function issueCommand(command, message) {
+function issueFileCommand(command, message) {
     const filePath = process.env[`GITHUB_${command}`];
     if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
@@ -488,7 +488,22 @@ function issueCommand(command, message) {
         encoding: 'utf8'
     });
 }
-exports.issueCommand = issueCommand;
+exports.issueFileCommand = issueFileCommand;
+function prepareKeyValueMessage(key, value) {
+    const delimiter = `ghadelimiter_${uuid_1.v4()}`;
+    const convertedValue = utils_1.toCommandValue(value);
+    // These should realistically never happen, but just in case someone finds a
+    // way to exploit uuid generation let's not allow keys or values that contain
+    // the delimiter.
+    if (key.includes(delimiter)) {
+        throw new Error(`Unexpected input: name should not contain the delimiter "${delimiter}"`);
+    }
+    if (convertedValue.includes(delimiter)) {
+        throw new Error(`Unexpected input: value should not contain the delimiter "${delimiter}"`);
+    }
+    return `${key}<<${delimiter}${os.EOL}${convertedValue}${os.EOL}${delimiter}`;
+}
+exports.prepareKeyValueMessage = prepareKeyValueMessage;
 //# sourceMappingURL=file-command.js.map
 
 /***/ }),
@@ -8984,27 +8999,26 @@ function coerce (version, options) {
 /***/ 7029:
 /***/ ((__unused_webpack_module, exports) => {
 
+"use strict";
+
+
 exports.quote = function (xs) {
-    return xs.map(function (s) {
-        if (s && typeof s === 'object') {
-            return s.op.replace(/(.)/g, '\\$1');
-        }
-        else if (/["\s]/.test(s) && !/'/.test(s)) {
-            return "'" + s.replace(/(['\\])/g, '\\$1') + "'";
-        }
-        else if (/["'\s]/.test(s)) {
-            return '"' + s.replace(/(["\\$`!])/g, '\\$1') + '"';
-        }
-        else {
-            return String(s).replace(/([A-Za-z]:)?([#!"$&'()*,:;<=>?@\[\\\]^`{|}])/g, '$1\\$2');
-        }
-    }).join(' ');
+	return xs.map(function (s) {
+		if (s && typeof s === 'object') {
+			return s.op.replace(/(.)/g, '\\$1');
+		} else if ((/["\s]/).test(s) && !(/'/).test(s)) {
+			return "'" + s.replace(/(['\\])/g, '\\$1') + "'";
+		} else if ((/["'\s]/).test(s)) {
+			return '"' + s.replace(/(["\\$`!])/g, '\\$1') + '"';
+		}
+		return String(s).replace(/([A-Za-z]:)?([#!"$&'()*,:;<=>?@[\\\]^`{|}])/g, '$1\\$2');
+	}).join(' ');
 };
 
 // '<(' is process substitution operator and
 // can be parsed the same as control operator
 var CONTROL = '(?:' + [
-    '\\|\\|', '\\&\\&', ';;', '\\|\\&', '\\<\\(', '>>', '>\\&', '[&;()|<>]'
+	'\\|\\|', '\\&\\&', ';;', '\\|\\&', '\\<\\(', '>>', '>\\&', '[&;()|<>]'
 ].join('|') + ')';
 var META = '|&;()<> \\t';
 var BAREWORD = '(\\\\[\'"' + META + ']|[^\\s\'"' + META + '])+';
@@ -9013,176 +9027,182 @@ var DOUBLE_QUOTE = '\'((\\\\\'|[^\'])*?)\'';
 
 var TOKEN = '';
 for (var i = 0; i < 4; i++) {
-    TOKEN += (Math.pow(16,8)*Math.random()).toString(16);
+	TOKEN += (Math.pow(16, 8) * Math.random()).toString(16);
+}
+
+function parse(s, env, opts) {
+	var chunker = new RegExp([
+		'(' + CONTROL + ')', // control chars
+		'(' + BAREWORD + '|' + SINGLE_QUOTE + '|' + DOUBLE_QUOTE + ')*'
+	].join('|'), 'g');
+	var match = s.match(chunker).filter(Boolean);
+
+	if (!match) {
+		return [];
+	}
+	if (!env) {
+		env = {};
+	}
+	if (!opts) {
+		opts = {};
+	}
+
+	var commented = false;
+
+	function getVar(_, pre, key) {
+		var r = typeof env === 'function' ? env(key) : env[key];
+		if (r === undefined && key != '') {
+			r = '';
+		} else if (r === undefined) {
+			r = '$';
+		}
+
+		if (typeof r === 'object') {
+			return pre + TOKEN + JSON.stringify(r) + TOKEN;
+		}
+		return pre + r;
+	}
+
+	return match.map(function (s, j) {
+		if (commented) {
+			return void undefined;
+		}
+		if (RegExp('^' + CONTROL + '$').test(s)) {
+			return { op: s };
+		}
+
+		// Hand-written scanner/parser for Bash quoting rules:
+		//
+		// 1. inside single quotes, all characters are printed literally.
+		// 2. inside double quotes, all characters are printed literally
+		//    except variables prefixed by '$' and backslashes followed by
+		//    either a double quote or another backslash.
+		// 3. outside of any quotes, backslashes are treated as escape
+		//    characters and not printed (unless they are themselves escaped)
+		// 4. quote context can switch mid-token if there is no whitespace
+		//     between the two quote contexts (e.g. all'one'"token" parses as
+		//     "allonetoken")
+		var SQ = "'";
+		var DQ = '"';
+		var DS = '$';
+		var BS = opts.escape || '\\';
+		var quote = false;
+		var esc = false;
+		var out = '';
+		var isGlob = false;
+		var i;
+
+		function parseEnvVar() {
+			i += 1;
+			var varend;
+			var varname;
+			// debugger
+			if (s.charAt(i) === '{') {
+				i += 1;
+				if (s.charAt(i) === '}') {
+					throw new Error('Bad substitution: ' + s.substr(i - 2, 3));
+				}
+				varend = s.indexOf('}', i);
+				if (varend < 0) {
+					throw new Error('Bad substitution: ' + s.substr(i));
+				}
+				varname = s.substr(i, varend - i);
+				i = varend;
+			} else if ((/[*@#?$!_-]/).test(s.charAt(i))) {
+				varname = s.charAt(i);
+				i += 1;
+			} else {
+				varend = s.substr(i).match(/[^\w\d_]/);
+				if (!varend) {
+					varname = s.substr(i);
+					i = s.length;
+				} else {
+					varname = s.substr(i, varend.index);
+					i += varend.index - 1;
+				}
+			}
+			return getVar(null, '', varname);
+		}
+
+		for (i = 0; i < s.length; i++) {
+			var c = s.charAt(i);
+			isGlob = isGlob || (!quote && (c === '*' || c === '?'));
+			if (esc) {
+				out += c;
+				esc = false;
+			} else if (quote) {
+				if (c === quote) {
+					quote = false;
+				} else if (quote == SQ) {
+					out += c;
+				} else { // Double quote
+					if (c === BS) {
+						i += 1;
+						c = s.charAt(i);
+						if (c === DQ || c === BS || c === DS) {
+							out += c;
+						} else {
+							out += BS + c;
+						}
+					} else if (c === DS) {
+						out += parseEnvVar();
+					} else {
+						out += c;
+					}
+				}
+			} else if (c === DQ || c === SQ) {
+				quote = c;
+			} else if (RegExp('^' + CONTROL + '$').test(c)) {
+				return { op: s };
+			} else if ((/^#$/).test(c)) {
+				commented = true;
+				if (out.length) {
+					return [out, { comment: s.slice(i + 1) + match.slice(j + 1).join(' ') }];
+				}
+				return [{ comment: s.slice(i + 1) + match.slice(j + 1).join(' ') }];
+			} else if (c === BS) {
+				esc = true;
+			} else if (c === DS) {
+				out += parseEnvVar();
+			} else {
+				out += c;
+			}
+		}
+
+		if (isGlob) {
+			return { op: 'glob', pattern: out };
+		}
+
+		return out;
+	}).reduce(function (prev, arg) { // finalize parsed aruments
+		if (arg === undefined) {
+			return prev;
+		}
+		return prev.concat(arg);
+	}, []);
 }
 
 exports.parse = function (s, env, opts) {
-    var mapped = parse(s, env, opts);
-    if (typeof env !== 'function') return mapped;
-    return mapped.reduce(function (acc, s) {
-        if (typeof s === 'object') return acc.concat(s);
-        var xs = s.split(RegExp('(' + TOKEN + '.*?' + TOKEN + ')', 'g'));
-        if (xs.length === 1) return acc.concat(xs[0]);
-        return acc.concat(xs.filter(Boolean).map(function (x) {
-            if (RegExp('^' + TOKEN).test(x)) {
-                return JSON.parse(x.split(TOKEN)[1]);
-            }
-            else return x;
-        }));
-    }, []);
+	var mapped = parse(s, env, opts);
+	if (typeof env !== 'function') {
+		return mapped;
+	}
+	return mapped.reduce(function (acc, s) {
+		if (typeof s === 'object') {
+			return acc.concat(s);
+		}
+		var xs = s.split(RegExp('(' + TOKEN + '.*?' + TOKEN + ')', 'g'));
+		if (xs.length === 1) {
+			return acc.concat(xs[0]);
+		}
+		return acc.concat(xs.filter(Boolean).map(function (x) {
+			if (RegExp('^' + TOKEN).test(x)) {
+				return JSON.parse(x.split(TOKEN)[1]);
+			}
+			return x;
+		}));
+	}, []);
 };
-
-function parse (s, env, opts) {
-    var chunker = new RegExp([
-        '(' + CONTROL + ')', // control chars
-        '(' + BAREWORD + '|' + SINGLE_QUOTE + '|' + DOUBLE_QUOTE + ')*'
-    ].join('|'), 'g');
-    var match = s.match(chunker).filter(Boolean);
-    var commented = false;
-
-    if (!match) return [];
-    if (!env) env = {};
-    if (!opts) opts = {};
-    return match.map(function (s, j) {
-        if (commented) {
-            return;
-        }
-        if (RegExp('^' + CONTROL + '$').test(s)) {
-            return { op: s };
-        }
-
-        // Hand-written scanner/parser for Bash quoting rules:
-        //
-        //  1. inside single quotes, all characters are printed literally.
-        //  2. inside double quotes, all characters are printed literally
-        //     except variables prefixed by '$' and backslashes followed by
-        //     either a double quote or another backslash.
-        //  3. outside of any quotes, backslashes are treated as escape
-        //     characters and not printed (unless they are themselves escaped)
-        //  4. quote context can switch mid-token if there is no whitespace
-        //     between the two quote contexts (e.g. all'one'"token" parses as
-        //     "allonetoken")
-        var SQ = "'";
-        var DQ = '"';
-        var DS = '$';
-        var BS = opts.escape || '\\';
-        var quote = false;
-        var esc = false;
-        var out = '';
-        var isGlob = false;
-
-        for (var i = 0, len = s.length; i < len; i++) {
-            var c = s.charAt(i);
-            isGlob = isGlob || (!quote && (c === '*' || c === '?'));
-            if (esc) {
-                out += c;
-                esc = false;
-            }
-            else if (quote) {
-                if (c === quote) {
-                    quote = false;
-                }
-                else if (quote == SQ) {
-                    out += c;
-                }
-                else { // Double quote
-                    if (c === BS) {
-                        i += 1;
-                        c = s.charAt(i);
-                        if (c === DQ || c === BS || c === DS) {
-                            out += c;
-                        } else {
-                            out += BS + c;
-                        }
-                    }
-                    else if (c === DS) {
-                        out += parseEnvVar();
-                    }
-                    else {
-                        out += c;
-                    }
-                }
-            }
-            else if (c === DQ || c === SQ) {
-                quote = c;
-            }
-            else if (RegExp('^' + CONTROL + '$').test(c)) {
-                return { op: s };
-            }
-            else if (RegExp('^#$').test(c)) {
-                commented = true;
-                if (out.length){
-                    return [out, { comment: s.slice(i+1) + match.slice(j+1).join(' ') }];
-                }
-                return [{ comment: s.slice(i+1) + match.slice(j+1).join(' ') }];
-            }
-            else if (c === BS) {
-                esc = true;
-            }
-            else if (c === DS) {
-                out += parseEnvVar();
-            }
-            else out += c;
-        }
-
-        if (isGlob) return {op: 'glob', pattern: out};
-
-        return out;
-
-        function parseEnvVar() {
-            i += 1;
-            var varend, varname;
-            //debugger
-            if (s.charAt(i) === '{') {
-                i += 1;
-                if (s.charAt(i) === '}') {
-                    throw new Error("Bad substitution: " + s.substr(i - 2, 3));
-                }
-                varend = s.indexOf('}', i);
-                if (varend < 0) {
-                    throw new Error("Bad substitution: " + s.substr(i));
-                }
-                varname = s.substr(i, varend - i);
-                i = varend;
-            }
-            else if (/[*@#?$!_\-]/.test(s.charAt(i))) {
-                varname = s.charAt(i);
-                i += 1;
-            }
-            else {
-                varend = s.substr(i).match(/[^\w\d_]/);
-                if (!varend) {
-                    varname = s.substr(i);
-                    i = s.length;
-                } else {
-                    varname = s.substr(i, varend.index);
-                    i += varend.index - 1;
-                }
-            }
-            return getVar(null, '', varname);
-        }
-    })
-    // finalize parsed aruments
-    .reduce(function(prev, arg){
-        if (arg === undefined){
-            return prev;
-        }
-        return prev.concat(arg);
-    },[]);
-
-    function getVar (_, pre, key) {
-        var r = typeof env === 'function' ? env(key) : env[key];
-        if (r === undefined && key != '')
-            r = '';
-        else if (r === undefined)
-            r = '$';
-
-        if (typeof r === 'object') {
-            return pre + TOKEN + JSON.stringify(r) + TOKEN;
-        }
-        else return pre + r;
-    }
-}
 
 
 /***/ }),
