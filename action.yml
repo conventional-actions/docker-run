@@ -23,9 +23,14 @@ inputs:
     description: 'Docker Network ID'
     default: ${{ job.container.network }}
     required: false
+outputs:
+  docker-version:
+    description: 'Set by run scripts that append to GITHUB_OUTPUT (e.g. docker-version=value)'
+  file-contents:
+    description: 'Set by run scripts that append file-contents to GITHUB_OUTPUT'
 runs:
-  using: 'node20'
-  main: 'dist/main/index.js'
+  using: 'node24'
+  main: 'dist/index.cjs'
 branding:
   color: purple
   icon: clock

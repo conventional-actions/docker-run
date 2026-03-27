@@ -13,6 +13,12 @@ async function run(): Promise<void> {
       '/var/run/docker.sock:/var/run/docker.sock'
     ]
 
+    const ghOutput = process.env.GITHUB_OUTPUT
+    if (ghOutput) {
+      args.push('-e', `GITHUB_OUTPUT=${ghOutput}`)
+      args.push('-v', `${ghOutput}:${ghOutput}`)
+    }
+
     if (config.options) {
       args = args.concat(config.options)
     }
