@@ -34,7 +34,7 @@
     "@actions/core": "^1.11.1",
     "@actions/exec": "^1.1.1",
     "@conventional-actions/toolkit": "^1.1.5",
-    "shell-quote": "^1.7.4"
+    "shell-quote": "^1.8.4"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
